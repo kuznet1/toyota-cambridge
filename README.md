@@ -89,5 +89,5 @@ Other models may have different connectors.
 | Resistors       | 220 Ω, 1 kΩ                                                              | 0.1      |
 | KF301           | Terminal blocks, at least 5 pcs; also good for signal ground connections | 0.5      |
 | Prototype board | Fits [nicely](images/in-place.jpg) on a 50×70 mm board                   | 1        |
-| Button          | OEM-style illuminated button with indicator (AliExpress)                 | 5        |
+| Button          | OEM-style illuminated non-fixed button with indicator (AliExpress)       | 5        |
 | **Total**       |                                                                          | **~$40** |
