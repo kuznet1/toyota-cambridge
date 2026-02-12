@@ -19,12 +19,14 @@ enum State {
   AUTO,
   FRONT_ON,
   FRONT_OFF,
+  REV_ON
 };
 
 const State fwdSeq1[] = { AUTO, FRONT_ON, FRONT_OFF };
 const State fwdSeq2[] = { AUTO, FRONT_OFF, FRONT_ON };
-const State revSeq[] = { AUTO, FRONT_ON};
-const State* curSeq = fwdSeq1;
+const State parkSeq[] = { FRONT_OFF, FRONT_ON, REV_ON };
+const State revSeq[] = { REV_ON, FRONT_ON};
+const State* curSeq = parkSeq;
 int curSeqIndex = 0;
 
 AceButton button(BUTTON);
@@ -35,26 +37,47 @@ void handleButtonEvent(AceButton* button, uint8_t eventType, uint8_t buttonState
   }
 
   int stateCount = curSeq == revSeq ? 2 : 3;
-  curSeqIndex = (curSeqIndex + 1) % stateCount;
+  int newSeqIndex = (curSeqIndex + 1) % stateCount;
+  setState(curSeq, newSeqIndex);
+}
+
+State setState(const State newSeq[], int newSeqIndex) {
+  if (curSeq == newSeq && curSeqIndex == newSeqIndex) {
+    return curSeq[curSeqIndex];
+  }
+  
+  curSeq = newSeq;
+  curSeqIndex = newSeqIndex;
   State state = curSeq[curSeqIndex];
 
   switch (state) {
     case AUTO:
       Serial.println("State: auto");
-      digitalWrite(INDICATOR, LOW);
-      return;
+      digitalWrite(RELAY, HIGH);
+      break;
     case FRONT_ON:
       Serial.println("State: front on");
       digitalWrite(RELAY, HIGH);
       digitalWrite(TRIGGER, HIGH);
-      digitalWrite(INDICATOR, HIGH);
-      return;
+      break;
     case FRONT_OFF:
       Serial.println("State: front off");
       digitalWrite(TRIGGER, LOW);
-      digitalWrite(INDICATOR, HIGH);
-      return;
+      break;
+    case REV_ON:
+      Serial.println("State: rev on");
+      digitalWrite(RELAY, LOW);
+      digitalWrite(TRIGGER, HIGH);
+      break;
   }
+
+  if (curSeqIndex == 0) {
+    digitalWrite(INDICATOR, LOW);
+  } else {
+    digitalWrite(INDICATOR, HIGH);
+  }
+  
+  return state;
 }
 
 int getLeverPosition(const twai_message_t &msg) {
@@ -157,16 +180,21 @@ State buttonState(int position, bool isFrontCamEnabled) {
   static int lastPosition = PARK;
   if (lastPosition != position) {
     lastPosition = position;
-    curSeqIndex = 0;
-    digitalWrite(INDICATOR, LOW);
+    if (position == REVERSE) {
+      return setState(revSeq, 0);
+    }
+    if (position == PARK) {
+      return setState(parkSeq, 0);
+    }
+    return setState(isFrontCamEnabled ? fwdSeq2 : fwdSeq1, 0);
   }
 
   State state = curSeq[curSeqIndex];
-  if (state == AUTO) {
-    curSeq = position == REVERSE ? revSeq : isFrontCamEnabled ? fwdSeq2 :fwdSeq1;
+  if (state != AUTO) {
+    return state;
   }
   
-  return state;
+  return setState(isFrontCamEnabled ? fwdSeq2 : fwdSeq1, 0);
 }
 
 void logic(int position, float speed, bool frontParktronic) {
@@ -181,23 +209,6 @@ void logic(int position, float speed, bool frontParktronic) {
   }
 
   if (position == NEUTRAL || speed > 9 && speed <= 10) {
-    return;
-  }
-
-  if (position == DRIVE) {
-    digitalWrite(RELAY, HIGH);
-  } else {
-    digitalWrite(RELAY, LOW);
-  }
-
-  if (position == REVERSE) {
-    digitalWrite(TRIGGER, HIGH);
-    return;
-  }
-
-  if (position != DRIVE) {
-    digitalWrite(TRIGGER, LOW);
-    isFrontCamEnabled = false;
     return;
   }
 
