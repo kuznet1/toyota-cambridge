@@ -9,6 +9,7 @@ Tested on the 4th generation RAV4, but will likely work with other models as wel
 CamBridge connects to the **CAN bus** and reads data from:
 - the gear selector,
 - vehicle speed,
+- prake pressure,
 - parking sensors.
 
 Based on this data, the device decides when and which camera to activate.
@@ -19,6 +20,7 @@ Based on this data, the device decides when and which camera to activate.
 - When in **D**, the front camera turns on if:
     - gear **D** has been engaged less than 2 seconds ago;
     - speed < 10 km/h and the car is moving or stopped for less than 2 seconds;
+    - the car is stopped and brake pressure < 5 bar;
     - the parking sensor detects an obstacle in front.
 
 **Button (optional):**  

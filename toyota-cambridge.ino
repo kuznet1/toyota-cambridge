@@ -152,6 +152,28 @@ float getSpeed(const twai_message_t &msg) {
   return speed;
 }
 
+int getBrakePressure(const twai_message_t &msg) {
+  static int lastPressure = 0;
+
+  if (msg.identifier != 0x226) {
+    return lastPressure;
+  }
+
+  if (msg.data_length_code < 2) {
+    Serial.printf("Brake pressure message is too short: %d bytes\n", msg.data_length_code);
+    return lastPressure;
+  }
+
+  int pressure = (msg.data[0] << 8 | msg.data[1]) * 20;
+
+  if (pressure == lastPressure) {
+    return lastPressure;
+  }
+
+  Serial.printf("Brake pressure: %d\n", pressure);
+  lastPressure = pressure;
+  return pressure;
+}
 
 bool frontParktronic(const twai_message_t &msg) {
   static int lastVal = 0;
@@ -197,7 +219,7 @@ State buttonState(int position, bool isFrontCamEnabled) {
   return setState(isFrontCamEnabled ? fwdSeq2 : fwdSeq1, 0);
 }
 
-void logic(int position, float speed, bool frontParktronic) {
+void logic(int position, float speed, bool frontParktronic, int brakePressure) {
   static long lastEnabledTime = 0;
   static bool isFrontCamEnabled = false;
   static int lastPosition = PARK;
@@ -212,12 +234,13 @@ void logic(int position, float speed, bool frontParktronic) {
     return;
   }
 
+  bool enableByBrake = speed == 0 && brakePressure < 500;
   long now = millis();
-  if (speed > 0 || isSwitchedToDrive || frontParktronic) {
+  if (speed > 0 || isSwitchedToDrive || frontParktronic || enableByBrake) {
     lastEnabledTime = now;
   }
 
-  isFrontCamEnabled = now - lastEnabledTime < 2000 && speed <= 10 || frontParktronic;
+  isFrontCamEnabled = now - lastEnabledTime < 2000 && speed <= 10 || frontParktronic || enableByBrake;
   if (isFrontCamEnabled) {
     digitalWrite(TRIGGER, HIGH);
   } else {
@@ -253,6 +276,6 @@ void loop() {
   button.check();
   twai_message_t msg;
   if (twai_receive(&msg, pdMS_TO_TICKS(100)) == ESP_OK) {
-    logic(getLeverPosition(msg), getSpeed(msg), frontParktronic(msg));
+    logic(getLeverPosition(msg), getSpeed(msg), frontParktronic(msg), getBrakePressure(msg));
   }
 }
